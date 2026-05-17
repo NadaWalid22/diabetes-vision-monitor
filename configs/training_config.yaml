@@ -1,0 +1,39 @@
+data:
+  data_dir: data/ohio/
+  sample_dir: data/sample/
+  seq_len: 24          # 2 hours of 5-min CGM readings
+  pred_horizons: [6, 12]  # 30-min and 60-min ahead
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+  normalize: true
+
+model:
+  type: lstm           # lstm | temporal_cnn | baseline
+  lstm:
+    hidden_size: 64
+    num_layers: 2
+    dropout: 0.2
+    bidirectional: false
+  temporal_cnn:
+    num_channels: [32, 64, 64]
+    kernel_size: 3
+    dropout: 0.2
+  baseline:
+    type: linear
+
+training:
+  epochs: 100
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 1.0e-4
+  patience: 15         # early stopping patience
+  seed: 42
+  device: auto         # auto | cpu | cuda | mps
+
+logging:
+  use_wandb: false     # set true to enable Weights & Biases
+  wandb_project: diabetes-vision-monitor
+  save_dir: results/
+  checkpoint_dir: models/checkpoints/
+  log_every: 10        # log every N epochs
