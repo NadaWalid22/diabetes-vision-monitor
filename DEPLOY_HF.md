@@ -25,18 +25,14 @@ git init
 git add .
 git commit -m "Initial deploy"
 
-git remote add space https://huggingface.co/spaces/YOUR_HF_USERNAME/glucosense-ai
+git remote add space https://huggingface.co/spaces/NadaWalid22/glucosense-ai
 git push space main
 ```
-Replace `YOUR_HF_USERNAME` with your actual HF username.
-
 ## 5. Update the README link
 Edit README.md line:
 ```
-**Live demo:** [glucosense-ai on Hugging Face Spaces](https://huggingface.co/spaces/YOUR_HF_USERNAME/glucosense-ai)
+**Live demo:** [glucosense-ai on Hugging Face Spaces](https://huggingface.co/spaces/NadaWalid22/glucosense-ai)
 ```
-Replace `YOUR_HF_USERNAME` with your actual username, then push again.
-
 ## Notes
 - First build takes 3-5 minutes (installing torch)
 - The Space auto-rebuilds on every push
