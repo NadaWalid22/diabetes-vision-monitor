@@ -100,16 +100,19 @@ For development and demo, a synthetic dataset is included that simulates realist
 
 ## Results
 
-Results below are on **synthetic data** (30-day simulation). Replace with OhioT1DM results after training.
+Trained on **real OhioT1DM data** — 6 patients, 12 XML files (training + testing splits per patient), 5-min CGM readings.  
+Patient-level 70/15/15 train/val/test split. Shared scaler fit on training data only. Evaluated on held-out test windows.
 
-| Model | MARD 30-min | RMSE 30-min | MARD 60-min | RMSE 60-min | Zone A (30-min) |
-|-------|-------------|-------------|-------------|-------------|-----------------|
-| Linear baseline | 4.7% | 7.9 mg/dL | 9.3% | 14.5 mg/dL | 100%* |
-| **Temporal CNN** | **4.6%** | **8.9 mg/dL** | **8.0%** | **15.2 mg/dL** | **96.6%** |
-| LSTM | 10.2% | 19.5 mg/dL | 12.0% | 22.7 mg/dL | 81.3% |
+| Model | MARD 30-min | RMSE 30-min | MAE 30-min | MARD 60-min | RMSE 60-min | Zone A (30-min) | Zone B (30-min) |
+|-------|-------------|-------------|------------|-------------|-------------|-----------------|-----------------|
+| **Linear baseline** | **11.0%** | **23.2 mg/dL** | **16.5 mg/dL** | **18.2%** | **35.1 mg/dL** | **85.7%** | **13.8%** |
+| Temporal CNN | 17.0% | 35.3 mg/dL | 27.0 mg/dL | 33.1% | 66.3 mg/dL | 72.6% | 26.7% |
+| LSTM | 24.7% | 47.6 mg/dL | 39.0 mg/dL | 26.3% | 50.6 mg/dL | 45.1% | 45.4% |
 
-*Trained on 7-day synthetic dataset. Results on OhioT1DM will differ.*  
-*\*Linear baseline 100% Zone A is misleading — it regresses toward the mean, producing safe-range predictions that lack clinical specificity. The TCN's 96.6% is the meaningful result.*
+*Train: 22,202 windows · Val: 4,425 · Test: 4,440. Device: Apple MPS.*
+
+**Why does the linear baseline win here?**  
+CGM data has very strong short-range autocorrelation — glucose rarely changes faster than ~2 mg/dL/min, so a learned linear extrapolation already captures most of the signal. With only ~8 weeks of data per patient (small by deep learning standards), the neural networks overfit before learning the underlying physiology. The proper fix is per-patient fine-tuning, more patients, or auxiliary features (insulin, meals, activity), none of which are in this version. This is a known finding in the glucose prediction literature — see Oviedo et al. (2017) for a survey.
 
 **Clarke Error Grid zones:**
 - **Zone A** (clinically accurate): target >95%

@@ -69,7 +69,13 @@ def build_model(model_type: str, cfg: dict, num_horizons: int) -> nn.Module:
 
 
 def load_data(cfg: dict) -> tuple[np.ndarray, np.ndarray]:
-    """Load OhioT1DM data or fall back to synthetic sample data."""
+    """Load OhioT1DM data or fall back to synthetic sample data.
+
+    OhioT1DM has one XML file per patient — timestamps overlap across patients,
+    so each file is cleaned independently before windows are concatenated.
+    """
+    import pandas as pd
+
     data_dir = Path(cfg["data"]["data_dir"])
     sample_dir = Path(cfg["data"]["sample_dir"])
 
@@ -78,37 +84,61 @@ def load_data(cfg: dict) -> tuple[np.ndarray, np.ndarray]:
         pred_horizons=cfg["data"]["pred_horizons"],
     )
 
-    xml_files = list(data_dir.glob("*.xml")) if data_dir.exists() else []
+    xml_files = sorted(data_dir.glob("*.xml")) if data_dir.exists() else []
     if xml_files:
         print(f"Loading OhioT1DM data from {data_dir} ({len(xml_files)} files)...")
-        dfs = [processor.load_ohio_xml(str(f)) for f in xml_files]
-        import pandas as pd
-        df = pd.concat(dfs, ignore_index=True).sort_values("datetime").reset_index(drop=True)
+
+        # Collect all training data to fit a single shared scaler
+        all_train_dfs = []
+        per_file_splits = []
+        for f in xml_files:
+            df = processor.load_ohio_xml(str(f))
+            df = processor.clean(df)
+            n = len(df)
+            train_end = int(n * cfg["data"]["train_split"])
+            val_end = train_end + int(n * cfg["data"]["val_split"])
+            all_train_dfs.append(df.iloc[:train_end])
+            per_file_splits.append((df.iloc[:train_end], df.iloc[train_end:val_end], df.iloc[val_end:]))
+
+        processor.fit_scaler(pd.concat(all_train_dfs, ignore_index=True))
+        normalize = cfg["data"]["normalize"]
+
+        Xs_train, ys_train = [], []
+        Xs_val, ys_val = [], []
+        Xs_test, ys_test = [], []
+        for train_df, val_df, test_df in per_file_splits:
+            if len(train_df) > cfg["data"]["seq_len"] + max(cfg["data"]["pred_horizons"]):
+                X, y = processor.make_windows(train_df, normalize=normalize)
+                Xs_train.append(X); ys_train.append(y)
+            if len(val_df) > cfg["data"]["seq_len"] + max(cfg["data"]["pred_horizons"]):
+                X, y = processor.make_windows(val_df, normalize=normalize)
+                Xs_val.append(X); ys_val.append(y)
+            if len(test_df) > cfg["data"]["seq_len"] + max(cfg["data"]["pred_horizons"]):
+                X, y = processor.make_windows(test_df, normalize=normalize)
+                Xs_test.append(X); ys_test.append(y)
+
+        X_train = np.concatenate(Xs_train); y_train = np.concatenate(ys_train)
+        X_val   = np.concatenate(Xs_val);   y_val   = np.concatenate(ys_val)
+        X_test  = np.concatenate(Xs_test);  y_test  = np.concatenate(ys_test)
+
     else:
         print(f"OhioT1DM data not found — loading synthetic sample data from {sample_dir}.")
-        import pandas as pd
         csv_files = list(sample_dir.glob("*.csv"))
         if not csv_files:
             print("No data found. Run: python data/sample/generate_synthetic.py")
             raise FileNotFoundError("No data available. Generate synthetic data first.")
         df = pd.concat([pd.read_csv(f, parse_dates=["datetime"]) for f in csv_files],
                        ignore_index=True)
-
-    df = processor.clean(df)
-    n = len(df)
-    train_end = int(n * cfg["data"]["train_split"])
-    val_end = train_end + int(n * cfg["data"]["val_split"])
-
-    train_df = df.iloc[:train_end]
-    val_df = df.iloc[train_end:val_end]
-    test_df = df.iloc[val_end:]
-
-    processor.fit_scaler(train_df)
-    normalize = cfg["data"]["normalize"]
-
-    X_train, y_train = processor.make_windows(train_df, normalize=normalize)
-    X_val, y_val = processor.make_windows(val_df, normalize=normalize)
-    X_test, y_test = processor.make_windows(test_df, normalize=normalize)
+        df = processor.clean(df)
+        n = len(df)
+        train_end = int(n * cfg["data"]["train_split"])
+        val_end = train_end + int(n * cfg["data"]["val_split"])
+        train_df, val_df, test_df = df.iloc[:train_end], df.iloc[train_end:val_end], df.iloc[val_end:]
+        processor.fit_scaler(train_df)
+        normalize = cfg["data"]["normalize"]
+        X_train, y_train = processor.make_windows(train_df, normalize=normalize)
+        X_val,   y_val   = processor.make_windows(val_df,   normalize=normalize)
+        X_test,  y_test  = processor.make_windows(test_df,  normalize=normalize)
 
     return (X_train, y_train), (X_val, y_val), (X_test, y_test), processor
 
