@@ -29,7 +29,7 @@ Models are evaluated using the **Clarke Error Grid** (EGA), the standard clinica
 
 ## Demo
 
-**Live demo:** [glucosense-ai on Hugging Face Spaces](https://huggingface.co/spaces/YOUR_HF_USERNAME/glucosense-ai) ← replace after deploy
+**Live demo:** [glucosense-ai on Hugging Face Spaces](https://huggingface.co/spaces/naddaa/glucosense-ai)
 
 **Run locally:**
 ```bash
